@@ -14,11 +14,10 @@ using UnicodePlots
 # & eigenvalues (i.e. the electronic energies and states), the gradients of the eigenvectors
 # and the non-adiabatic couplings 
 #
-# At the moment, there are still some problems with the phase of the NACs - the eigval func-
-# tion I use seems to occasionally produce phase flips. I'll either work out an analytical 
-# form of the eigenvectors or just create a phase tracker.
-#
-#
+# At the moment, there are some problems with the phase. I use an analytical form of the 
+# eigenvectors, but it still seems that the coupling occasionally has the wrong sign (seemingly
+# in model III, at least in comparison with tully's original paper. This can be easily fixed
+# in an ad-hoc manner (just multiply by -1...) but I'll have a look at fixing it properly
 
 function Tully_I(x::Float64,A::Float64=0.01,B::Float64=1.6,C::Float64=0.005,D::Float64=1.0)
         #
