@@ -70,6 +70,7 @@ function Tully_II(x::Float64,A::Float64=0.1,B::Float64=0.28,C::Float64=0.015,D::
         mat = zeros(Float64,(2,2))
         #dmat will become the gradient matrix - i.e. the matrix of the derivative of each matrix element
         dmat = zeros(Float64,(2,2))
+        
         mat[2,2] = -A*exp(-B*x^2)+E
         dmat[2,2] = 2*A*B*x*exp(-B*x^2)
         mat[1,2] = C*exp(-D*x^2)
@@ -109,13 +110,13 @@ function Tully_III(x::Float64,A::Float64=0.0006,B::Float64=0.1,C::Float64=0.9)
         return mat, dmat
 end
 
-function Tully_IV(x::Float64,A::Float64=0.0006,B::Float64=0.1,C::Float64=0.9,D::Float64=0.4)
-        # I found this online too, idk where it's from - it's effectively a modification of model III
-        # to extend it to making going further...
+
+function Dumbbell(x::Float64,A::Float64=0.0006,B::Float64=0.1,C::Float64=0.9,Z::Float64=10.)
+        # Dumbbell Hamiltonian from J. E. Subotnik and N. Shenvi, J. Chem. Phys. 134, 2011
         # 
         # - input
         #   - x - value of the function to be evaluated
-        #   - A, B, C, D - parameters for the model, Tully's original parameters are the default
+        #   - A, B, C, Z - parameters for the model, Subotnik's original parameters are the default
         # 
         # - output
         #   - mat - 2x2 matrix of the diabatic potential, as defined in Tully's paper
@@ -125,17 +126,52 @@ function Tully_IV(x::Float64,A::Float64=0.0006,B::Float64=0.1,C::Float64=0.9,D::
         mat = zeros(Float64,(2,2))
         #dmat will become the gradient matrix - i.e. the matrix of the derivative of each matrix element
         dmat = zeros(Float64,(2,2))
-        mat[1,1] = -A
-        mat[2,2] = A
-        if x < -D
-                mat[1,2]  =   B*(-exp( C*(x-D))+exp( C*(x+D)))
-                dmat[1,2] = C*B*(-exp( C*(x-D))+exp( C*(x+D)))
-        elseif x < D
-                mat[1,2]  =   B*(-exp( C*(x-D))-exp(-C*(x+D)))+2*B
-                dmat[1,2] = C*B*(-exp( C*(x-D))+exp(-C*(x+D)))
+        mat[1,1] = A
+        mat[2,2] = -A
+        if x < -Z
+                mat[1,2]  =   B*( exp( C*(x-Z))+2-exp( C*(x+Z)))
+                dmat[1,2] = C*B*( exp( C*(x-Z))-exp( C*(x+Z)))
+        elseif x < Z
+                mat[1,2]  =   B*( exp( C*(x-Z))+exp(-C*(x+Z)))
+                dmat[1,2] = C*B*( exp( C*(x-Z))-exp(-C*(x+Z)))
         else
-                mat[1,2]  =   B*( exp(-C*(x-D))-exp(-C*(x+D)))
-                dmat[1,2] = C*B*(-exp(-C*(x-D))+exp(-C*(x+D)))
+                mat[1,2]  =   B*(2-exp(-C*(x-Z))+exp(-C*(x+Z)))
+                dmat[1,2] = C*B*( exp(-C*(x-Z))-exp(-C*(x+Z)))
+        end
+        mat[2,1] = mat[1,2]
+        dmat[2,1] = dmat[1,2]
+
+        return mat, dmat
+end
+
+function Double_Arch(x::Float64,A::Float64=0.0006,B::Float64=0.1,C::Float64=0.9,Z::Float64=4.)
+        # Double arch hamiltonian from J. E. Subotnik and N. Shenvi, J. Chem. Phys. 134, 2011
+        # 
+        # I found a Z=0.4 problem works well also
+        #
+        # - input
+        #   - x - value of the function to be evaluated
+        #   - A, B, C, Z - parameters for the model, Subotnik's original parameters are the default
+        # 
+        # - output
+        #   - mat - 2x2 matrix of the diabatic potential, as defined in Tully's paper
+        #   - dmat - 2x2 matrix of the derivatives of the diabatic potential matrix elements
+        
+        #init matrices of zeros
+        mat = zeros(Float64,(2,2))
+        #dmat will become the gradient matrix - i.e. the matrix of the derivative of each matrix element
+        dmat = zeros(Float64,(2,2))
+        mat[1,1] = A
+        mat[2,2] = -A
+        if x < -Z
+                mat[1,2]  =   B*(-exp( C*(x-Z))+exp( C*(x+Z)))
+                dmat[1,2] = C*B*(-exp( C*(x-Z))+exp( C*(x+Z)))
+        elseif x < Z
+                mat[1,2]  =   B*(-exp( C*(x-Z))-exp(-C*(x+Z)))+2*B
+                dmat[1,2] = C*B*(-exp( C*(x-Z))+exp(-C*(x+Z)))
+        else
+                mat[1,2]  =   B*( exp(-C*(x-Z))-exp(-C*(x+Z)))
+                dmat[1,2] = C*B*(-exp(-C*(x-Z))+exp(-C*(x+Z)))
         end
         mat[2,1] = mat[1,2]
         dmat[2,1] = dmat[1,2]
@@ -209,7 +245,6 @@ function ADIABATISER(mat::Array{Float64}, dmat::Array{Float64})
         # use analytical function to get eigenvalues and eigenvectors
         evals = zeros(Float64,2)
         evecs = ones(Float64,(2,2))
-
         evals[1] = 0.5 * (mat[1,1]+mat[2,2]-sqrt(mat[1,1]^2+mat[2,2]^2+4*mat[1,2]*mat[2,1]-2*mat[1,1]*mat[2,2]))
         evals[2] = 0.5 * (mat[1,1]+mat[2,2]+sqrt(mat[1,1]^2+mat[2,2]^2+4*mat[1,2]*mat[2,1]-2*mat[1,1]*mat[2,2]))
        
@@ -236,12 +271,17 @@ function ADIABATISER(mat::Array{Float64}, dmat::Array{Float64})
 end
 
 
+macro Name(arg) # returns name of function as string
+   string(arg)
+end
 
 # this section just plots them. 
 
-length = 1000
+length = 2000
 
-x = range(-10.,10.,length=length)
+x = range(-20.,20.,length=length)
+
+for f in [Tully_I,Tully_II,Tully_III,Dumbbell,Double_Arch, Cooper_I]
 
 pot_1 = zeros(Float64,length)
 pot_2 = zeros(Float64,length)
@@ -250,7 +290,7 @@ der_2 = zeros(Float64,length)
 coup = zeros(Float64,length)
 
 @time @views  for i in 1:length
-        a=ADIABATISER(Tully_V(x[i])...)
+        a=ADIABATISER(f(x[i])...)
         pot_1[i] = a[1][1]
         pot_2[i] = a[1][2]
         der_1[i] = a[3][1]
@@ -261,9 +301,13 @@ coup = zeros(Float64,length)
         #pot_2[i] = a[1][2,2]
         #der_1[i] = a[1][1,2]
 end
-plot(x ,pot_1, label = "E_1", title="Tully Model V")
+a = floor(maximum(abs.(coup))/maximum(abs.(pot_1)))
+coup /= a
+plotly()
+plot(x ,pot_1, label = "E_1", title=string(f))
 plot!(x,pot_2, label = "E_2")
-plot!(x,der_1, label = "∇E_1")
-plot!(x,der_2, label = "∇E_2")
-plot!(x ,coup, label = "D_12")
-savefig("Tully_V.png")
+#plot!(x,der_1, label = "∇E_1")
+#plot!(x,der_2, label = "∇E_2")
+plot!(x ,coup, label = "D_12/"*string(a))
+savefig(string(f)*".pdf")
+end
